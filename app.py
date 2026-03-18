@@ -21,9 +21,12 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 DOMAIN = "https://discord-verify-web-7lod.onrender.com"
 
-API_SECRET = os.environ.get("API_SECRET")  # ← 追加（セキュリティ用）
+# 👇 ここ追加（超重要）
+NGROK_URL = os.environ.get("NGROK_URL")
 
-TOKEN_EXPIRE = 300  # 5分
+API_SECRET = os.environ.get("API_SECRET")
+
+TOKEN_EXPIRE = 300
 
 # ========================
 # 🔑 トークン管理
@@ -98,11 +101,10 @@ def verify(token):
         TOKENS.pop(token, None)
         return "リンク期限切れ", 403
 
-    # GET → ページ表示
     if request.method == "GET":
         return render_template_string(HTML, site_key=SITE_KEY)
 
-    # POST → CAPTCHA
+    # CAPTCHA
     captcha = request.form.get("cf-turnstile-response")
 
     res = requests.post(
@@ -118,9 +120,10 @@ def verify(token):
 
     user_id = data["user_id"]
 
+    # 👇 ここが最重要修正
     try:
         r = requests.post(
-            f"{DOMAIN}/api/verify",
+            f"{NGROK_URL}/api/verify",
             json={
                 "user_id": user_id,
                 "secret": API_SECRET
@@ -129,6 +132,7 @@ def verify(token):
         )
 
         if r.status_code != 200:
+            print("❌ API STATUS:", r.status_code)
             return "<h2>❌ 認証失敗（APIエラー）</h2>"
 
     except Exception as e:
@@ -140,29 +144,10 @@ def verify(token):
     return SUCCESS
 
 # ========================
-# 🤖 Bot連携API
-# ========================
-@app.route("/api/verify", methods=["POST"])
-def api_verify():
-    data = request.get_json()
-
-    # 🔒 シークレットチェック
-    if data.get("secret") != API_SECRET:
-        return {"error": "unauthorized"}, 403
-
-    user_id = data.get("user_id")
-
-    if not user_id:
-        return {"error": "no user_id"}, 400
-
-    print("🎉 認証成功 user:", user_id)
-
-    # 👉 ここでBot処理に渡す（今はログだけ）
-    return {"status": "ok"}
-
-# ========================
 # 🚀 起動
 # ========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
+
