@@ -3,8 +3,8 @@ import requests
 
 app = Flask(__name__)
 
-SITE_KEY = "ここにsite key"
-SECRET_KEY = "ここにsecret key"
+SITE_KEY = "0x4AAAAAACsw5njeX3Amm_bR"
+SECRET_KEY = "0x4AAAAAACsw5jeV2woESqgaF56JIm9OP9Y"
 
 HTML = """
 <!DOCTYPE html>
