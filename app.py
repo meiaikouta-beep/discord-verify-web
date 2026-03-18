@@ -25,7 +25,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #000000, #111111, #1a1a1a);
     font-family: sans-serif;
 }
 .container {
@@ -116,13 +116,14 @@ p {
 </html>
 """
 
-FAIL_HTML = """
+HTML = """
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>認証失敗</title>
+<title>認証</title>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
 <style>
 body {
     margin: 0;
@@ -130,29 +131,75 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: #fff5f5;
+    background: linear-gradient(135deg, #667eea, #764ba2);
     font-family: sans-serif;
 }
-.box {
+.container {
     background: white;
     padding: 40px;
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     text-align: center;
+    width: 90%;
+    max-width: 380px;
 }
-h2 {
-    color: #e53935;
+#turnstile-box {
+    margin: 20px 0;
+    display: flex;
+    justify-content: center;
 }
-p {
-    color: #666;
+#error-msg {
+    color: red;
+    font-size: 13px;
+    margin-top: 10px;
+    white-space: pre-wrap;
+}
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #667eea;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
 }
 </style>
 </head>
 <body>
-<div class="box">
-    <h2>❌ 認証失敗</h2>
-    <p>もう一度お試しください</p>
+<div class="container">
+    <h2>本人確認</h2>
+    <p>数秒で完了します</p>
+
+    <form method="POST">
+        <input type="hidden" name="user_id" value="{{ user_id }}">
+        <div id="turnstile-box"></div>
+        <div id="error-msg"></div>
+        <button type="submit">認証する</button>
+    </form>
 </div>
+
+<script>
+window.onload = function () {
+    try {
+        turnstile.render('#turnstile-box', {
+            sitekey: '{{ site_key }}',
+            callback: function(token) {
+                console.log('Turnstile success:', token);
+            },
+            'error-callback': function(code) {
+                console.log('Turnstile error:', code);
+                document.getElementById('error-msg').textContent =
+                    'CAPTCHAの読み込みに失敗しました: ' + code;
+            }
+        });
+    } catch (e) {
+        console.log('Turnstile render exception:', e);
+        document.getElementById('error-msg').textContent =
+            'CAPTCHA描画例外: ' + e;
+    }
+};
+</script>
 </body>
 </html>
 """
