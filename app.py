@@ -22,8 +22,9 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 DOMAIN = "https://discord-verify-web-7lod.onrender.com"
 
 # 👇 ここ追加（超重要）
-NGROK_URL = os.environ.get("NGROK_URL")
+NGROK_URL = "https://danna-choicer-jestingly.ngrok-free.dev"
 DOMAIN = NGROK_URL
+
 
 API_SECRET = os.environ.get("API_SECRET")
 
