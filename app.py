@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template_string
 import requests
 import threading
-
+import os
 app = Flask(__name__)
 
 VERIFY_ROLE_REMOVE = 1483816333870366801
@@ -250,8 +250,10 @@ def verify_api():
 
 
 def run_flask():
-    app.run(host="0.0.0.0", port=10000, threaded=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, threaded=True)
 
 
 threading.Thread(target=run_flask, daemon=True).start()
+
 
