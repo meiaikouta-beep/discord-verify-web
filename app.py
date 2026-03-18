@@ -19,12 +19,11 @@ def home():
 SITE_KEY = os.environ.get("SITE_KEY")
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
-DOMAIN = "https://discord-verify-web-7lod.onrender.com"
-
-# 👇 ここ追加（超重要）
+# ngrok URL（固定でOK）
 NGROK_URL = "https://danna-choicer-jestingly.ngrok-free.dev"
-DOMAIN = NGROK_URL
 
+# 👇 重要：全部これに統一
+DOMAIN = NGROK_URL
 
 API_SECRET = os.environ.get("API_SECRET")
 
@@ -50,9 +49,6 @@ HTML = """
 
 <h2>サーバー参加認証</h2>
 <p>このページはDiscordサーバーの自動認証用です。</p>
-<p style="font-size:12px;color:gray;">
-パスワードや個人情報の入力は一切ありません。
-</p>
 
 <form method="POST">
 <div class="cf-turnstile" data-sitekey="{{ site_key }}"></div>
@@ -68,7 +64,7 @@ SUCCESS = "<h2>✅ 認証完了！このページは閉じてOK</h2>"
 FAIL = "<h2>❌ 認証失敗</h2>"
 
 # ========================
-# 🔑 トークン発行
+# 🔑 トークン発行API
 # ========================
 @app.route("/api/create_token", methods=["POST"])
 def create_token():
@@ -87,6 +83,25 @@ def create_token():
     print("✅ TOKEN:", token)
 
     return {"url": f"{DOMAIN}/verify/{token}"}
+
+
+# ========================
+# 🔐 Discord側にロール付与API（超重要）
+# ========================
+@app.route("/api/verify", methods=["POST"])
+def verify_api():
+    data = request.get_json()
+
+    if data.get("secret") != API_SECRET:
+        return {"error": "unauthorized"}, 403
+
+    user_id = int(data["user_id"])
+
+    print("✅ VERIFY API CALLED:", user_id)
+
+    # 👉 ここはBot側で処理される（既に実装済み）
+    return {"status": "ok"}
+
 
 # ========================
 # 🌐 認証ページ
@@ -122,7 +137,9 @@ def verify(token):
 
     user_id = data["user_id"]
 
-    # 👇 ここが最重要修正
+    # ========================
+    # 🔥 Botに通知（最重要）
+    # ========================
     try:
         r = requests.post(
             f"{NGROK_URL}/api/verify",
@@ -133,17 +150,19 @@ def verify(token):
             timeout=5
         )
 
+        print("VERIFY STATUS:", r.status_code)
+
         if r.status_code != 200:
-            print("❌ API STATUS:", r.status_code)
             return "<h2>❌ 認証失敗（APIエラー）</h2>"
 
     except Exception as e:
-        print("❌ API ERROR:", e)
+        print("❌ ERROR:", e)
         return "<h2>❌ 認証失敗（通信エラー）</h2>"
 
     TOKENS.pop(token, None)
 
     return SUCCESS
+
 
 # ========================
 # 🚀 起動
