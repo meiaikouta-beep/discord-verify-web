@@ -146,7 +146,6 @@ def verify_page():
 
         return render_template_string(HTML, site_key=SITE_KEY, user_id=user_id)
 
-    # POST
     try:
         user_id = request.form.get("user_id")
         token = request.form.get("cf-turnstile-response")
@@ -167,33 +166,30 @@ def verify_page():
                 "secret": SECRET_KEY,
                 "response": token
             },
-            timeout=15
+            timeout=10
         ).json()
 
         print("🔥 Turnstile verify result:", response)
 
         if not response.get("success"):
+            print("❌ Turnstile失敗")
             return FAIL_HTML, 400
 
-        # Bot通知APIを呼ぶ
-        api_res = requests.post(
-            "http://127.0.0.1:10000/api/verify",
-            json={"user_id": int(user_id)},
-            timeout=15
-        )
-
-        print("🔥 API STATUS:", api_res.status_code)
-        print("🔥 API BODY:", api_res.text)
-
-        if api_res.status_code != 200:
-            return FAIL_HTML, 500
+        # ここではDiscord処理を待たない
+        try:
+            requests.post(
+                "http://127.0.0.1:10000/api/verify",
+                json={"user_id": int(user_id)},
+                timeout=3
+            )
+        except Exception as e:
+            print("❌ API CALL ERROR:", e)
 
         return SUCCESS_HTML
 
     except Exception as e:
         print("❌ VERIFY PAGE ERROR:", e)
         return FAIL_HTML, 500
-
 
 # Bot通知API
 @app.route("/api/verify", methods=["POST"])
@@ -216,22 +212,29 @@ def verify_api():
 
         async def process():
             try:
+                print("⏳ 1. member取得開始")
+
                 member = guild.get_member(user_id)
                 if member is None:
+                    print("⏳ 2. get_memberで見つからないのでfetch_member")
                     member = await guild.fetch_member(user_id)
+                else:
+                    print("✅ 2. get_memberで取得成功")
 
-                print("member:", member)
+                print("✅ 3. member:", member)
 
                 remove_role = guild.get_role(VERIFY_ROLE_REMOVE)
                 add_role = guild.get_role(VERIFY_ROLE_ADD)
 
+                print("⏳ 4. remove role")
                 if remove_role:
                     await member.remove_roles(remove_role)
 
+                print("⏳ 5. add role")
                 if add_role:
                     await member.add_roles(add_role)
 
-                print("✅ ロール処理完了")
+                print("✅ 6. ロール処理完了")
 
             except Exception as e:
                 print("❌ PROCESS ERROR:", e)
@@ -245,8 +248,9 @@ def verify_api():
         return {"error": str(e)}, 500
 
 
+
 def run_flask():
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000, threaded=True)
 
 
 threading.Thread(target=run_flask, daemon=True).start()
