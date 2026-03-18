@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template_string
 import requests
+import threading
 
 app = Flask(__name__)
 
@@ -136,6 +137,7 @@ FAIL_HTML = """
 def home():
     return "Flask is running!"
 
+
 @app.route("/verify", methods=["GET", "POST"])
 def verify():
     user_id = request.args.get("user_id")
@@ -152,12 +154,21 @@ def verify():
         ).json()
 
         if response.get("success"):
-            print(f"認証成功 user_id={user_id}")
+            requests.post(
+                "https://danna-choicer-jestingly.ngrok-free.dev/verify",
+                json={"user_id": user_id}
+            )
+
             return SUCCESS_HTML
         else:
             return FAIL_HTML
 
     return render_template_string(HTML, site_key=SITE_KEY)
 
-if __name__ == "__main__":
+
+# 🔥 Botと一緒にFlaskを動かす
+def run_flask():
     app.run(host="0.0.0.0", port=10000)
+
+
+threading.Thread(target=run_flask).start()
