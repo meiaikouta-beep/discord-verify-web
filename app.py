@@ -1,24 +1,38 @@
 from flask import Flask, request, render_template_string, abort
 import requests
-import os
 import secrets
 import time
+import os
 
 app = Flask(__name__)
 
+# ========================
+# 🏠 動作確認
+# ========================
 @app.route("/")
 def home():
     return "Flask is running!"
 
-SITE_KEY = "0x4AAAAAACsw5njeX3Amm_bR"
-SECRET_KEY = "0x4AAAAAACsw5jeV2woESqgaF56JIm9OP9Y"
+# ========================
+# 🔧 設定
+# ========================
+SITE_KEY = os.environ.get("SITE_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
-# トークン管理（簡易DB）
+DOMAIN = "https://discord-verify-web-7lod.onrender.com"
+
+API_SECRET = os.environ.get("API_SECRET")  # ← 追加（セキュリティ用）
+
+TOKEN_EXPIRE = 300  # 5分
+
+# ========================
+# 🔑 トークン管理
+# ========================
 TOKENS = {}
 
-# 有効期限（秒）
-TOKEN_EXPIRE = 300
-
+# ========================
+# 🌐 HTML
+# ========================
 HTML = """
 <!DOCTYPE html>
 <html lang="ja">
@@ -48,21 +62,30 @@ HTML = """
 SUCCESS = "<h2>✅ 認証完了！このページは閉じてOK</h2>"
 FAIL = "<h2>❌ 認証失敗</h2>"
 
-# 🔑 トークン発行（Botから呼ぶ用）
+# ========================
+# 🔑 トークン発行
+# ========================
 @app.route("/api/create_token", methods=["POST"])
 def create_token():
-    user_id = request.json.get("user_id")
+    data = request.get_json()
+
+    if not data or "user_id" not in data:
+        return {"error": "user_id missing"}, 400
 
     token = secrets.token_urlsafe(32)
+
     TOKENS[token] = {
-        "user_id": user_id,
+        "user_id": data["user_id"],
         "time": time.time()
     }
 
-    return {"url": f"https://discord-verify-web-7lod.onrender.com/verify/{token}"}
+    print("✅ TOKEN:", token)
 
+    return {"url": f"{DOMAIN}/verify/{token}"}
 
+# ========================
 # 🌐 認証ページ
+# ========================
 @app.route("/verify/<token>", methods=["GET", "POST"])
 def verify(token):
 
@@ -73,12 +96,13 @@ def verify(token):
     # 期限チェック
     if time.time() - data["time"] > TOKEN_EXPIRE:
         TOKENS.pop(token, None)
-        return "期限切れ", 403
+        return "リンク期限切れ", 403
 
+    # GET → ページ表示
     if request.method == "GET":
         return render_template_string(HTML, site_key=SITE_KEY)
 
-    # POST（CAPTCHA）
+    # POST → CAPTCHA
     captcha = request.form.get("cf-turnstile-response")
 
     res = requests.post(
@@ -94,19 +118,54 @@ def verify(token):
 
     user_id = data["user_id"]
 
-    # Bot側処理（同じサーバー推奨）
-    requests.post(
-        "https://discord-verify-web-7lod.onrender.com/verify/",
-        json={"user_id": user_id}
-    )
+    try:
+        r = requests.post(
+            f"{DOMAIN}/api/verify",
+            json={
+                "user_id": user_id,
+                "secret": API_SECRET
+            },
+            timeout=5
+        )
+
+        if r.status_code != 200:
+            return "<h2>❌ 認証失敗（APIエラー）</h2>"
+
+    except Exception as e:
+        print("❌ API ERROR:", e)
+        return "<h2>❌ 認証失敗（通信エラー）</h2>"
 
     TOKENS.pop(token, None)
 
     return SUCCESS
 
+# ========================
+# 🤖 Bot連携API
+# ========================
+@app.route("/api/verify", methods=["POST"])
+def api_verify():
+    data = request.get_json()
 
+    # 🔒 シークレットチェック
+    if data.get("secret") != API_SECRET:
+        return {"error": "unauthorized"}, 403
+
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return {"error": "no user_id"}, 400
+
+    print("🎉 認証成功 user:", user_id)
+
+    # 👉 ここでBot処理に渡す（今はログだけ）
+    return {"status": "ok"}
+
+# ========================
+# 🚀 起動
+# ========================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 
 
