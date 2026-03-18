@@ -23,6 +23,7 @@ DOMAIN = "https://discord-verify-web-7lod.onrender.com"
 
 # 👇 ここ追加（超重要）
 NGROK_URL = os.environ.get("NGROK_URL")
+DOMAIN = NGROK_URL
 
 API_SECRET = os.environ.get("API_SECRET")
 
@@ -149,5 +150,3 @@ def verify(token):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
-
