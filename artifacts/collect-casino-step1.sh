@@ -31,16 +31,28 @@ for root in /opt/games-hub /opt/games-party; do
     while IFS= read -r -d '' src; do copy_file "$src"; done
 done
 
-# サービス名に現れない「ちいかわ」側を /opt 全体からゲーム名で特定
+# サービス名に現れない「ちいかわ」側を /opt と talksurvivor.online 配下から特定
 PATTERN='poker|ポーカー|roulette|ルーレット|baccarat|バカラ|南国|slot|スロット|boat|ボート'
+mapfile -t SITE_DIRS < <(find /opt /var/www /srv /root -maxdepth 6 -type d -name 'talksurvivor.online' 2>/dev/null | sort -u)
+printf '%s\n' "${SITE_DIRS[@]}" > "$STAGE/metadata/talksurvivor-directories.txt"
 if command -v rg >/dev/null 2>&1; then
+  SEARCH_ROOTS=(/opt)
+  SEARCH_ROOTS+=("${SITE_DIRS[@]}")
   rg -l -i --hidden \
     --glob '!node_modules/**' --glob '!.git/**' --glob '!logs/**' \
-    --glob '!*.min.js' --glob '!*.map' --glob '!*.db' --glob '!*.sqlite*' --glob '!*.env' \
-    "$PATTERN" /opt 2>/dev/null | while IFS= read -r src; do
+    --glob '!*.map' --glob '!*.db' --glob '!*.sqlite*' --glob '!*.env' \
+    "$PATTERN" "${SEARCH_ROOTS[@]}" 2>/dev/null | while IFS= read -r src; do
       [[ -f "$src" && $(stat -c '%s' "$src") -lt 3000000 ]] && copy_file "$src"
     done
 fi
+
+for site in "${SITE_DIRS[@]}"; do
+  find "$site" -maxdepth 5 -type f \
+    \( -name 'server.cjs' -o -name 'server.js' -o -name 'app.py' -o -name 'index.html' -o -name 'package.json' \) \
+    -not -path '*/node_modules/*' -not -path '*/.git/*' -size -3M -print0 |
+    while IFS= read -r -d '' src; do copy_file "$src"; done
+  find "$site" -maxdepth 6 -type d -printf '%p\n' 2>/dev/null | sort >> "$STAGE/metadata/talksurvivor-tree.txt"
+done
 
 find /opt -maxdepth 3 -type d -printf '%p\n' 2>/dev/null | sort > "$STAGE/metadata/opt-directories.txt"
 find /opt/games-hub /opt/games-party -maxdepth 4 -type f -not -path '*/node_modules/*' -printf '%s bytes  %p\n' 2>/dev/null | sort -k2 > "$STAGE/metadata/file-inventory.txt"
